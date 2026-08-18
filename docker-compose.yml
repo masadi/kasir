@@ -1,10 +1,19 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: kasirku-mongo
+  postgres:
+    image: postgres:16-alpine
+    container_name: kasirku-postgres
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kasirku}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-kasirku}
     volumes:
-      - mongo_data:/data/db
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kasirku} -d ${POSTGRES_DB:-kasirku}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - kasirku-net
 
@@ -17,9 +26,10 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - MONGO_URL=mongodb://mongo:27017
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-kasirku}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-kasirku}
     depends_on:
-      - mongo
+      postgres:
+        condition: service_healthy
     networks:
       - kasirku-net
 
@@ -39,7 +49,7 @@ services:
       - kasirku-net
 
 volumes:
-  mongo_data:
+  pg_data:
 
 networks:
   kasirku-net:

@@ -5,7 +5,7 @@ Aplikasi kasir warung dengan **struk cetak thermal Bluetooth (ESC/POS)**, pembay
 - **Kasir**: Mobile PWA di **Android + Chrome** (Web Bluetooth wajib — tidak jalan di iOS).
 - **Pemilik**: Dashboard desktop untuk produk, kasir, laporan, dan grafik 7 hari.
 
-Stack: **FastAPI + MongoDB + React (CRA) + Tailwind + shadcn/ui**. Object storage via Emergent.
+Stack: **FastAPI + PostgreSQL + React (CRA) + Tailwind + shadcn/ui**. Object storage via Emergent.
 
 ---
 
@@ -34,7 +34,6 @@ Stack: **FastAPI + MongoDB + React (CRA) + Tailwind + shadcn/ui**. Object storag
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y ca-certificates curl gnupg git ufw
 
-# Docker Engine + Compose plugin (resmi)
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 newgrp docker
@@ -53,7 +52,22 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Edit `backend/.env` dan `frontend/.env` sesuai bagian [Environment Variables](#environment-variables) di bawah.
+Edit `backend/.env` dan `frontend/.env` sesuai bagian [Environment Variables](#environment-variables). **Jangan lupa** ganti `JWT_SECRET`, `ADMIN_PASSWORD`, dan `POSTGRES_PASSWORD` (di root `.env` untuk docker-compose).
+
+Opsional — buat file `.env` di root project untuk override kredensial Postgres (dipakai oleh `docker-compose.yml`):
+```bash
+cat > .env <<'EOF'
+POSTGRES_USER=kasirku
+POSTGRES_PASSWORD=gantiPasswordIniYangKuat123
+POSTGRES_DB=kasirku
+PUBLIC_URL=https://kasirku.example.com
+EOF
+```
+
+Lalu sesuaikan `DATABASE_URL` di `backend/.env`:
+```
+DATABASE_URL="postgresql+asyncpg://kasirku:gantiPasswordIniYangKuat123@postgres:5432/kasirku"
+```
 
 ### 3. Jalankan
 ```bash
@@ -63,18 +77,17 @@ docker compose logs -f backend
 ```
 
 Aplikasi akan tersedia di:
-- `http://<IP-VPS>` (frontend + reverse proxy ke backend)
+- `http://<IP-VPS>:8080` (frontend + reverse proxy `/api` ke backend)
 
-Login pertama pakai `ADMIN_EMAIL` / `ADMIN_PASSWORD` yang kamu set di `backend/.env` (default seed owner otomatis dibuat saat startup).
+Login pertama pakai `ADMIN_EMAIL` / `ADMIN_PASSWORD` yang kamu set di `backend/.env` (owner default di-seed otomatis saat startup, dan tabel di-migrate otomatis via SQLAlchemy `create_all`).
 
 ### 4. HTTPS (Sangat Disarankan — WAJIB untuk Web Bluetooth)
 
-> **Web Bluetooth API HANYA jalan di halaman HTTPS** (kecuali `http://localhost`). Kalau kamu buka aplikasi via IP HTTP di HP kasir, tombol pairing printer **tidak akan bisa dipakai**. Wajib pakai domain + SSL.
+> **Web Bluetooth API HANYA jalan di halaman HTTPS** (kecuali `http://localhost`). Kalau buka aplikasi via IP HTTP di HP kasir, tombol pairing printer **tidak akan bisa dipakai**. Wajib pakai domain + SSL.
 
 Pakai **Caddy** (paling mudah, auto-SSL Let's Encrypt):
 
 ```bash
-# Di host VPS, install Caddy
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
@@ -89,13 +102,13 @@ EOF
 sudo systemctl restart caddy
 ```
 
-Ganti `kasirku.example.com` dengan domain milikmu. Caddy otomatis mengurus sertifikat Let's Encrypt.
+Ganti `kasirku.example.com` dengan domain milikmu.
 
-Setelah itu edit `frontend/.env`:
+Update `frontend/.env`:
 ```
 REACT_APP_BACKEND_URL=https://kasirku.example.com
 ```
-Lalu:
+Rebuild frontend:
 ```bash
 docker compose up -d --build frontend
 ```
@@ -115,43 +128,66 @@ git pull
 docker compose up -d --build
 ```
 
-### 7. Backup MongoDB
+### 7. Backup PostgreSQL
 ```bash
-docker exec kasirku-mongo mongodump --archive --db kasirku > backup-$(date +%F).archive
+# Backup harian (jadwalkan via cron)
+docker exec kasirku-postgres pg_dump -U kasirku -d kasirku -Fc \
+  > /opt/backups/kasirku-$(date +%F).dump
+
+# Contoh cron entry: setiap hari jam 23:30
+# 30 23 * * * docker exec kasirku-postgres pg_dump -U kasirku -d kasirku -Fc > /opt/backups/kasirku-$(date +\%F).dump
 ```
 
 Restore:
 ```bash
-cat backup-2026-02-18.archive | docker exec -i kasirku-mongo mongorestore --archive --drop
+docker exec -i kasirku-postgres pg_restore -U kasirku -d kasirku --clean --if-exists < /opt/backups/kasirku-2026-02-18.dump
 ```
 
 ---
 
 ## Environment Variables
 
+### Root `.env` (opsional, hanya untuk `docker-compose`)
+| Variable | Wajib | Contoh | Keterangan |
+|---|---|---|---|
+| `POSTGRES_USER` | ⬜ | `kasirku` | Default `kasirku`. |
+| `POSTGRES_PASSWORD` | ✅ | `passwordKuat123` | **Ganti dari default!** |
+| `POSTGRES_DB` | ⬜ | `kasirku` | Default `kasirku`. |
+| `PUBLIC_URL` | ⬜ | `https://kasirku.example.com` | Dipakai sebagai build-arg `REACT_APP_BACKEND_URL` untuk frontend. |
+
 ### `backend/.env`
 | Variable | Wajib | Contoh | Keterangan |
 |---|---|---|---|
-| `MONGO_URL` | ✅ | `mongodb://mongo:27017` | URL Mongo. Di docker-compose default sudah pakai service name `mongo`. |
-| `DB_NAME` | ✅ | `kasirku` | Nama database Mongo. |
-| `JWT_SECRET` | ✅ | random 64 hex | **JANGAN pakai default.** Generate: `openssl rand -hex 32` |
-| `ADMIN_EMAIL` | ✅ | `pemilik@warung.com` | Email owner default yang di-seed saat startup pertama. |
-| `ADMIN_PASSWORD` | ✅ | `gantiSaya123` | Password owner. Ubah setelah login pertama. |
+| `DATABASE_URL` | ✅ | `postgresql+asyncpg://kasirku:pass@postgres:5432/kasirku` | Koneksi Postgres via driver **asyncpg**. Wajib prefix `postgresql+asyncpg://`. |
+| `JWT_SECRET` | ✅ | random 64 hex | Generate: `openssl rand -hex 32`. Konsisten antar restart. |
+| `ADMIN_EMAIL` | ✅ | `pemilik@warung.com` | Owner default yang di-seed di startup pertama. |
+| `ADMIN_PASSWORD` | ✅ | `gantiSaya123` | Ubah setelah login pertama. |
 | `APP_NAME` | ✅ | `kasirku` | Prefix path object storage. |
-| `EMERGENT_LLM_KEY` | ✅* | `sk-emergent-xxx` | Kunci Emergent Object Storage. *Wajib kalau pakai fitur upload QRIS/foto produk. |
-| `INTEGRATION_PROXY_URL` | ⬜ | `https://integrations.emergentagent.com` | Default sudah benar, jangan diubah kecuali self-host. |
-| `CORS_ORIGINS` | ⬜ | `https://kasirku.example.com` | Origin frontend. Boleh `*` untuk dev, harus explicit domain di production. |
+| `EMERGENT_LLM_KEY` | ✅* | `sk-emergent-xxx` | Kunci Emergent Object Storage untuk upload QRIS/foto produk. |
+| `INTEGRATION_PROXY_URL` | ⬜ | `https://integrations.emergentagent.com` | Default sudah benar. |
+| `CORS_ORIGINS` | ⬜ | `https://kasirku.example.com` | Origin frontend production. `*` hanya untuk dev. |
 
 ### `frontend/.env`
 | Variable | Wajib | Contoh | Keterangan |
 |---|---|---|---|
-| `REACT_APP_BACKEND_URL` | ✅ | `https://kasirku.example.com` | URL public backend. Semua request `/api/*` diarahkan ke sini oleh nginx reverse proxy. |
+| `REACT_APP_BACKEND_URL` | ✅ | `https://kasirku.example.com` | URL public backend. **Dipakai saat build**, jadi harus rebuild frontend kalau URL berubah. |
 
 ### Tanpa Emergent Object Storage (Alternatif)
 Kalau tidak mau pakai Emergent Object Storage, kamu bisa:
-1. Ganti kode `put_object` / `get_object` di `backend/server.py` menjadi tulis ke folder lokal `/app/data/uploads/`
+1. Ganti `put_object` / `get_object` di `backend/server.py` menjadi write ke folder lokal `/app/data/uploads/`
 2. Mount volume di `docker-compose.yml`: `- ./data:/app/data`
 3. Kosongkan `EMERGENT_LLM_KEY`
+
+---
+
+## Migrasi Skema Database
+Skema tabel dibuat otomatis oleh SQLAlchemy `Base.metadata.create_all` saat backend startup pertama — tidak perlu jalankan migration manual untuk deployment awal.
+
+Untuk perubahan skema di masa depan (kolom baru, index, dll.), disarankan tambahkan [Alembic](https://alembic.sqlalchemy.org/) sebagai migration tool:
+```bash
+docker exec -it kasirku-backend pip install alembic
+docker exec -it kasirku-backend alembic init migrations
+```
 
 ---
 
@@ -172,24 +208,34 @@ Kalau tidak mau pakai Emergent Object Storage, kamu bisa:
 ---
 
 ## Development Lokal (tanpa Docker)
-Kalau mau kontribusi/debug:
 ```bash
-# Backend
+# 1. Jalankan Postgres via docker
+docker run -d --name kasirku-pg -p 5432:5432 \
+  -e POSTGRES_USER=kasirku -e POSTGRES_PASSWORD=kasirku_dev -e POSTGRES_DB=kasirku \
+  postgres:16-alpine
+
+# 2. Backend
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+
+# .env-mu harus punya:
+# DATABASE_URL="postgresql+asyncpg://kasirku:kasirku_dev@localhost:5432/kasirku"
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
-# Frontend
+# 3. Frontend
 cd frontend
 yarn install
 yarn start
 ```
-Butuh MongoDB lokal (`sudo apt install mongodb-org` atau `docker run -d -p 27017:27017 mongo:7`).
 
 ---
 
 ## Troubleshooting
+
+**Backend gagal start: `Connect call failed ('127.0.0.1', 5432)`**
+- Postgres belum ready. `docker-compose` sudah `depends_on: service_healthy`, tapi kalau jalankan manual pastikan Postgres up dulu.
+- Cek log: `docker compose logs postgres`
 
 **Printer tidak bisa dipair**
 - Pastikan buka aplikasi via HTTPS (bukan IP HTTP)
@@ -205,10 +251,14 @@ Butuh MongoDB lokal (`sudo apt install mongodb-org` atau `docker run -d -p 27017
 - Cek CORS: `CORS_ORIGINS` harus match domain frontend
 
 **Sales tidak masuk / stok tidak update**
-- Cek transaksi tersimpan: `docker exec -it kasirku-mongo mongosh kasirku --eval "db.transactions.find().pretty()"`
+- Cek transaksi tersimpan:
+  ```bash
+  docker exec -it kasirku-postgres psql -U kasirku -d kasirku -c "SELECT id, total, payment_method, created_at FROM transactions ORDER BY created_at DESC LIMIT 10;"
+  ```
 
-**Mongo penuh / slow**
-- Backup + `db.transactions.deleteMany({created_at: {$lt: "2025-01-01"}})` untuk transaksi lama
+**Postgres size / performance**
+- Vacuum + reindex berkala: `docker exec -it kasirku-postgres psql -U kasirku -d kasirku -c "VACUUM ANALYZE;"`
+- Arsip transaksi lama: `DELETE FROM transactions WHERE created_at < '2025-01-01';`
 
 ---
 
