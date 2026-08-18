@@ -1,0 +1,19 @@
+{
+  "name": "KasirKu - POS Warung",
+  "short_name": "KasirKu",
+  "description": "Kasir warung Indonesia dengan struk thermal dan pembayaran QRIS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#16A34A",
+  "background_color": "#F8FAFC",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

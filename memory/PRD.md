@@ -43,14 +43,21 @@ Aplikasi POS untuk warung Indonesia: pembayaran tunai + QRIS statis, struk cetak
 - Fetch dengan query-param auth token untuk `<img src>`
 - File endpoint: JWT + tenant owner_id check
 
+## Added 18 Feb 2026 (Iterasi 3)
+- **Fase 4 — PWA + Offline Mode**: manifest.json, service worker cache app shell, Dexie IndexedDB untuk products + pending_txns queue, auto-sync saat online event, banner offline/sync indicator.
+- **Foto Produk**: upload image dari Products page (backend already had image_path field). Grid kasir menampilkan foto atau initial letter fallback.
+
+## Migrasi DB (17 Feb 2026)
+- Backend beralih dari MongoDB ke **PostgreSQL** (SQLAlchemy async + asyncpg). Atomic stock decrement via SQL UPDATE ... RETURNING.
+
 ## Deferred / Backlog
-- **Fase 4 — PWA + Offline sync (Dexie.js)** — P1
 - Barcode scan, void/retur, diskon/promo — P2
 - Notif pemilik untuk QRIS besar (anti-fraud) — P2
 - Multi-cabang — P2
 - Void transaction & audit log — P2
-- Foto produk upload di UI (backend siap, UI belum) — P1
 - WhatsApp Business API otomatis (bukan wa.me) — P2
+- Alembic migrations — P1
+- Nightly pg_dump backup — P1
 
 ## Test Credentials
 Lihat `/app/memory/test_credentials.md`.

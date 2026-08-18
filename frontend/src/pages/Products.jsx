@@ -1,24 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { api, formatApiError } from "@/lib/api";
+import { api, fileUrl, formatApiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const UNITS = ["pcs", "kg", "ons", "botol", "bungkus"];
-const emptyForm = { name: "", price: 0, hpp: 0, stock: 0, unit: "pcs", low_stock_threshold: 5, category: "Umum" };
+const emptyForm = { name: "", price: 0, hpp: 0, stock: 0, unit: "pcs", low_stock_threshold: 5, category: "Umum", image_path: null };
 
 export default function Products() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
   const load = async () => setItems((await api.get("/products")).data);
   useEffect(() => { load(); }, []);
@@ -46,6 +48,28 @@ export default function Products() {
     load();
   };
 
+  const uploadPhoto = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { toast.error("File harus gambar"); return; }
+    if (f.size > 5 * 1024 * 1024) { toast.error("Ukuran gambar maks 5MB"); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const r = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setForm((prev) => ({ ...prev, image_path: r.data.path }));
+      toast.success("Foto terunggah");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Upload gagal");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const removePhoto = () => setForm((prev) => ({ ...prev, image_path: null }));
+
   return (
     <DashboardLayout title="Produk">
       <div className="flex items-center justify-between mb-6">
@@ -60,6 +84,7 @@ export default function Products() {
           <table className="w-full">
             <thead className="bg-slate-50 text-xs tracking-[0.15em] uppercase text-slate-500">
               <tr>
+                <th className="text-left p-4 w-16">Foto</th>
                 <th className="text-left p-4">Nama</th>
                 <th className="text-left p-4">Kategori</th>
                 <th className="text-right p-4">Harga</th>
@@ -71,6 +96,15 @@ export default function Products() {
             <tbody data-testid="products-table">
               {items.map((p) => (
                 <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="p-4">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">
+                      {p.image_path ? (
+                        <img src={fileUrl(p.image_path)} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                  </td>
                   <td className="p-4 font-semibold">{p.name}</td>
                   <td className="p-4 text-slate-500">{p.category}</td>
                   <td className="p-4 text-right">{rupiah(p.price)}</td>
@@ -89,7 +123,7 @@ export default function Products() {
                 </tr>
               ))}
               {items.length === 0 && (
-                <tr><td colSpan="6" className="p-8 text-center text-slate-500">Belum ada produk</td></tr>
+                <tr><td colSpan="7" className="p-8 text-center text-slate-500">Belum ada produk</td></tr>
               )}
             </tbody>
           </table>
@@ -97,11 +131,34 @@ export default function Products() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <DialogContent className="max-w-lg rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-black">{editing ? "Edit Produk" : "Produk Baru"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <Label>Foto Produk</Label>
+              <div className="mt-2 flex items-center gap-4">
+                <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                  {form.image_path ? (
+                    <img src={fileUrl(form.image_path)} alt="Preview" className="w-full h-full object-cover" data-testid="prod-image-preview" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="prod-image-input" />
+                  <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading} data-testid="prod-image-btn" className="min-h-[44px] rounded-xl border-2 font-semibold">
+                    <Upload className="w-4 h-4 mr-2" /> {uploading ? "Mengunggah..." : (form.image_path ? "Ganti Foto" : "Unggah Foto")}
+                  </Button>
+                  {form.image_path && (
+                    <Button type="button" variant="ghost" onClick={removePhoto} data-testid="prod-image-remove" className="text-red-600 h-8 text-xs">
+                      Hapus foto
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div>
               <Label>Nama</Label>
               <Input data-testid="prod-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="min-h-[56px] rounded-xl border-2 mt-2" />
