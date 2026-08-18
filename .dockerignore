@@ -10,7 +10,6 @@ __pycache__
 *.py[cod]
 .venv
 venv
-.env
 
 # tests
 coverage

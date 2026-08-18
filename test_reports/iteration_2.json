@@ -1,0 +1,44 @@
+{
+  "summary": "Backend regression testing after MongoDB (Motor) revert from PostgreSQL. All 13 pytest tests passed (100%). Verified: seeded owner login, JWT bearer auth, register + duplicate email, store CRUD + onboarding, products CRUD + barcode lookup, cashier CRUD + RBAC (cashier blocked from creating products / listing cashiers, allowed to read products), transactions with atomic $inc stock decrement and correct profit calculation ((price-hpp)*qty), reports summary (today/week/series-of-7/low_stock) increments after cash txn, multi-tenant isolation (owner B cannot see owner A's products/transactions/cashiers, barcode lookup returns 404 across tenants), and file upload/download ACL (401 no token, 401 bad token, 403 cross-tenant, 200 with valid owner token via ?auth=).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/transactions", "issue": "Stock decrement is not truly atomic across items — if one $inc fails mid-loop, prior products already decremented (no rollback). Loop uses find_one_and_update per item without a MongoDB transaction/session. Acceptable for single-instance but flag for future."},
+      {"endpoint": "POST /api/transactions", "issue": "No validation that requested qty <= current stock; stock can go negative silently."},
+      {"endpoint": "POST /api/transactions", "issue": "Profit uses submitted `it.price` but stored product hpp — if client sends manipulated price, profit is client-influenced. Consider recomputing subtotal/total server-side from DB product price."},
+      {"endpoint": "GET /api/files/{path}", "issue": "Token accepted via query string (?auth=) — leaks into server access logs / referrer. Fine for <img> use case but consider signed short-lived URLs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_kasirku_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add server-side stock validation to reject qty > stock before $inc.",
+    "(Optional) Recompute transaction totals/profit from DB product prices, not client-submitted values.",
+    "(Optional) Wrap transaction stock decrement in a MongoDB session/transaction for true atomicity across multi-item carts."
+  ],
+  "critical_code_review_comments": [
+    "server.py is a single 522-line file — acceptable for MVP, but consider splitting into routers/ (auth, store, products, cashiers, transactions, reports, files) as it grows.",
+    "Password hashing (bcrypt) and JWT correctly implemented; httpOnly cookies + Bearer fallback both work.",
+    "MongoDB _id correctly excluded via projection {'_id': 0} everywhere — good.",
+    "Multi-tenant isolation via owner_id filter in every query — verified correct.",
+    "No brute-force lockout / rate limiting on /auth/login — acceptable for POS but note for future hardening.",
+    "verify_password after admin seed update path: on password change in .env, admin password is re-hashed on startup — good idempotency."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_kasirku_api.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (skipped per request)"},
+  "test_credentials": "Seeded owner: achmadi291@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test data prefixed with TEST_ (products, users, transactions) written to real Mongo. Second owner registered per run with unique email (TEST_ownerb_<hex>@example.com). No cleanup fixture — safe as all TEST_ prefixed rows are isolated by owner_id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend fully validated on MongoDB (Motor). All API contracts preserved from the Postgres version. Only frontend E2E remains (was validated in iteration_1). If retesting backend, run: `cd /app && python -m pytest backend/tests/test_kasirku_api.py -v -p xdist -n 0`. Note pytest.ini forces xdist loadscope so `-n 0` disables it for cleaner output.",
+  "rca of the issue": "Not a bug fix iteration — this was a regression verification after main agent reverted server.py from PostgreSQL+SQLAlchemy back to MongoDB+Motor due to production infra only providing MongoDB. All API contracts and behavior preserved; no regressions found."
+}
