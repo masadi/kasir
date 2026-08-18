@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2, Upload, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const UNITS = ["pcs", "kg", "ons", "botol", "bungkus"];
-const emptyForm = { name: "", price: 0, hpp: 0, stock: 0, unit: "pcs", low_stock_threshold: 5, category: "Umum", image_path: null };
+const emptyForm = { name: "", price: 0, hpp: 0, stock: 0, unit: "pcs", low_stock_threshold: 5, category: "Umum", image_path: null, barcode: "" };
 
 export default function Products() {
   const [items, setItems] = useState([]);
@@ -187,6 +187,12 @@ export default function Products() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>Barcode (opsional)</Label>
+              <Input data-testid="prod-barcode" value={form.barcode || ""} onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                placeholder="8991234567890"
+                className="min-h-[56px] rounded-xl border-2 mt-2 font-mono" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

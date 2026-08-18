@@ -43,6 +43,9 @@ Aplikasi POS untuk warung Indonesia: pembayaran tunai + QRIS statis, struk cetak
 - Fetch dengan query-param auth token untuk `<img src>`
 - File endpoint: JWT + tenant owner_id check
 
+## Added 18 Feb 2026 (Iterasi 5)
+- **Barcode Scan**: Backend kolom `products.barcode` + endpoint `GET /api/products/by-barcode/{code}` + migrasi Alembic `0002_add_barcode`. Frontend `BarcodeScanner.jsx` pakai native `BarcodeDetector` API (Chrome Android) dengan fallback ketik manual, tombol scan di POS search bar, lookup cache lokal dulu (offline-friendly) lalu server.
+
 ## Added 18 Feb 2026 (Iterasi 4)
 - **Cetak Ulang Offline**: History page section "Antrean Offline" menampilkan pending txns dari IndexedDB, tombol Cetak per baris (via `printReceipt`) + tombol "Sinkron Sekarang" manual. Detail dialog juga menampilkan badge Antrean Offline.
 - **Alembic Migrations**: `backend/alembic.ini`, `migrations/env.py` (async), `migrations/versions/0001_initial.py`. Docker CMD sekarang jalankan `alembic upgrade head` sebelum uvicorn. `OfflineIndicator` dipindah ke App-level supaya sync listener aktif di semua route.

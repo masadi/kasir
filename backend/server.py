@@ -105,6 +105,7 @@ class Product(Base):
     low_stock_threshold: Mapped[float] = mapped_column(Float, default=5)
     category: Mapped[str] = mapped_column(String, default="Umum")
     image_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    barcode: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
@@ -213,6 +214,7 @@ class ProductIn(BaseModel):
     low_stock_threshold: float = 5
     category: str = "Umum"
     image_path: Optional[str] = None
+    barcode: Optional[str] = None
 
 class CashierIn(BaseModel):
     email: EmailStr
@@ -361,13 +363,24 @@ def product_to_dict(p: Product) -> dict:
     return {"id": p.id, "owner_id": p.owner_id, "name": p.name, "price": p.price,
             "hpp": p.hpp, "stock": p.stock, "unit": p.unit,
             "low_stock_threshold": p.low_stock_threshold, "category": p.category,
-            "image_path": p.image_path}
+            "image_path": p.image_path, "barcode": p.barcode}
 
 @api.get("/products")
 async def list_products(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     oid = owner_id_of(user)
     rows = (await db.execute(select(Product).where(Product.owner_id == oid, Product.is_deleted == False))).scalars().all()
     return [product_to_dict(p) for p in rows]
+
+@api.get("/products/by-barcode/{code}")
+async def get_product_by_barcode(code: str, user: dict = Depends(get_current_user),
+                                  db: AsyncSession = Depends(get_db)):
+    oid = owner_id_of(user)
+    p = (await db.execute(select(Product).where(
+        Product.owner_id == oid, Product.is_deleted == False, Product.barcode == code
+    ))).scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Barcode tidak dikenal")
+    return product_to_dict(p)
 
 @api.post("/products")
 async def create_product(p: ProductIn, user: dict = Depends(require_owner),

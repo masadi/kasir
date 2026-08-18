@@ -6,9 +6,10 @@ import { rupiah } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, LogOut, History as HistoryIcon, X, WifiOff } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, LogOut, History as HistoryIcon, X, WifiOff, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { printReceipt, isBluetoothSupported } from "@/lib/thermal-printer";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   isOnline,
   cacheProducts,
@@ -34,6 +35,7 @@ export default function POS() {
   const [cash, setCash] = useState("");
   const [lastTxn, setLastTxn] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const load = async () => {
     if (!ownerId) return;
@@ -115,6 +117,27 @@ export default function POS() {
     setCart(items);
   };
   const removeItem = (cartId) => setCart(cart.filter((x) => x.product_id !== cartId));
+
+  const onBarcodeDetected = async (code) => {
+    setShowScanner(false);
+    // Prefer local cache (works offline)
+    const match = products.find((p) => (p.barcode || "").trim() === code.trim());
+    if (match) {
+      addProduct(match);
+      toast.success(`+ ${match.name}`);
+      return;
+    }
+    // Fallback: query server if online
+    if (isOnline()) {
+      try {
+        const r = await api.get(`/products/by-barcode/${encodeURIComponent(code)}`);
+        addProduct(r.data);
+        toast.success(`+ ${r.data.name}`);
+        return;
+      } catch (e) { /* fallthrough */ }
+    }
+    toast.error(`Barcode "${code}" tidak dikenal`);
+  };
 
   const openPay = () => {
     if (cart.length === 0) { toast.error("Keranjang kosong"); return; }
@@ -203,8 +226,16 @@ export default function POS() {
             data-testid="pos-search"
             placeholder="Cari produk..."
             value={search} onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 min-h-[52px] rounded-xl border-2"
+            className="pl-10 pr-14 min-h-[52px] rounded-xl border-2"
           />
+          <button
+            onClick={() => setShowScanner(true)}
+            data-testid="pos-scan-btn"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="Scan barcode"
+          >
+            <ScanLine className="w-5 h-5" />
+          </button>
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pt-3 pb-1">
           {categories.map((c) => (
@@ -384,6 +415,8 @@ export default function POS() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <BarcodeScanner open={showScanner} onOpenChange={setShowScanner} onDetected={onBarcodeDetected} />
     </div>
   );
 }
