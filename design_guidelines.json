@@ -1,0 +1,92 @@
+{
+  "theme_and_concept": {
+    "name": "KasirKu POS",
+    "archetype": "Soft Utility with High Contrast",
+    "description": "Mobile-first POS cashier and desktop dashboard tailored for Indonesian warungs. Prioritizes massive touch targets, ultra-high contrast, and operational clarity.",
+    "theme_mode": "light",
+    "key_features": "Cashier grid, cart bottom sheet, dual-accent color logic, big summary cards, minimalist charts."
+  },
+  "typography": {
+    "font_families": {
+      "headings": "Manrope, sans-serif",
+      "body": "Figtree, sans-serif"
+    },
+    "scales": {
+      "h1": "text-4xl sm:text-5xl font-black tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "h4": "text-lg font-bold",
+      "body": "text-base md:text-lg leading-relaxed",
+      "large_number": "text-5xl sm:text-6xl font-black tracking-tighter"
+    },
+    "rules": [
+      "Never use Inter for headings.",
+      "Use wide-tracked uppercase for tiny labels (tracking-[0.2em]).",
+      "All headings must have tight letter spacing."
+    ]
+  },
+  "colors": {
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primary_action_blue": "#2563EB",
+    "primary_action_blue_hover": "#1D4ED8",
+    "money_green": "#16A34A",
+    "money_green_hover": "#15803D",
+    "text_main": "#0F172A",
+    "text_muted": "#475569",
+    "border": "#E2E8F0"
+  },
+  "layouts": {
+    "mobile_cashier": "Strictly mobile-first. Fixed top header (Search/Categories). Scrollable middle (Product Grid 2-3 cols). Fixed bottom sheet for Cart & massive 'Bayar' button. Use full-screen modals for numerical input.",
+    "desktop_dashboard": "Sidebar on left (w-64). Main content area right. High-density grid for metrics but with large typography. Recharts container must be minimal.",
+    "spacing": "Scale up spacing. Use p-6 to p-8 inside cards. Gap-4 to Gap-6 for grids."
+  },
+  "components": {
+    "buttons": "Must be min-h-[56px]. rounded-xl, font-bold, text-lg. Use money_green for 'Bayar/Cash/Checkout' and primary_action_blue for 'Save/Next/Add'.",
+    "inputs": "Must be min-h-[56px]. rounded-xl, text-lg, border-2 border-slate-200. Focus state: border-primary_action_blue ring-4 ring-primary_action_blue/20.",
+    "cards": "bg-white rounded-2xl border border-slate-200 shadow-sm. Inner padding p-6. No aggressive shadows.",
+    "modals": "Use Shadcn Dialog. Backdrop must be backdrop-blur-md bg-slate-900/40. Modal body rounded-2xl sm:rounded-3xl p-6.",
+    "charts": "Recharts for 7-day summary. Hide CartesianGrid lines. Use a single solid stroke (money_green) with Area gradient underneath. Minimal tooltip.",
+    "onboarding_wizard": "4 steps: Shop Info -> QRIS Upload -> Printer Pairing -> First Product. Use large progress indicators and full-screen step layouts."
+  },
+  "icons_and_media": {
+    "icon_library": "@phosphor-icons/react",
+    "images": [
+      {
+        "url": "https://images.pexels.com/photos/33633752/pexels-photo-33633752.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Vibrant Indonesian warung scene.",
+        "category": "onboarding_or_login_background"
+      }
+    ]
+  },
+  "motion": {
+    "hover_states": "Buttons and Cards: hover:-translate-y-1 hover:shadow-md transition-transform duration-200 ease-out.",
+    "active_states": "Buttons: active:scale-95.",
+    "entrance": "Staggered fade-up for product grids and list items."
+  },
+  "accessibility": {
+    "contrast": "Ensure white text on green/blue buttons meets WCAG AA.",
+    "touch_targets": "Minimum 56px height and width for all interactive elements.",
+    "focus_management": "Visible focus rings on all inputs and buttons."
+  },
+  "instructions_to_main_agent": [
+    "Setup routing for dual interfaces: Mobile Cashier (e.g., /pos) and Desktop Dashboard (e.g., /dashboard).",
+    "Install and use @phosphor-icons/react for icons.",
+    "Install and use 'sonner' for toast notifications.",
+    "Implement Shadcn UI components but override heights to min-h-[56px] for touch optimization.",
+    "Build the 4-step onboarding wizard using state to track steps.",
+    "In the POS grid, show products as large buttons with image (if any) or initials, name, and price.",
+    "Use Recharts for the owner dashboard '7-day graph', keeping it minimal and clean.",
+    "Ensure 'Bayar' button is persistently visible at the bottom of the POS screen.",
+    "Mock Bluetooth thermal printing using a simple console log or alert and WhatsApp reporting via window.open('https://wa.me/...').",
+    "All crucial elements MUST have data-testid attributes (e.g., data-testid='bayar-button', data-testid='login-button')."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do NOT add 'text-align: center' to the main App wrapper.",
+    "Do NOT use generic 'transition: all'. Explicitly transition transform, opacity, colors.",
+    "Do NOT use fully transparent backgrounds for overlays; always use glass-morphism (backdrop-blur-md).",
+    "Use large spacing values (p-6, p-8) to avoid a cramped look.",
+    "Avoid default 'Vercel-look'. Make it feel like a robust, friendly tool for shop owners.",
+    "Incorporate subtle micro-interactions everywhere."
+  ]
+}
