@@ -181,13 +181,30 @@ Kalau tidak mau pakai Emergent Object Storage, kamu bisa:
 ---
 
 ## Migrasi Skema Database
-Skema tabel dibuat otomatis oleh SQLAlchemy `Base.metadata.create_all` saat backend startup pertama — tidak perlu jalankan migration manual untuk deployment awal.
 
-Untuk perubahan skema di masa depan (kolom baru, index, dll.), disarankan tambahkan [Alembic](https://alembic.sqlalchemy.org/) sebagai migration tool:
+Skema dikelola pakai **Alembic**. Saat backend startup pertama, `Base.metadata.create_all` masih dipakai sebagai safety net (idempotent), tapi untuk perubahan skema baru gunakan Alembic.
+
 ```bash
-docker exec -it kasirku-backend pip install alembic
-docker exec -it kasirku-backend alembic init migrations
+# Masuk container backend (atau di dev lokal, cd backend + venv aktif)
+docker exec -it kasirku-backend bash
+
+# Cek status
+alembic current
+
+# Autogenerate migration dari perubahan model
+alembic revision --autogenerate -m "add column products.barcode"
+
+# Terapkan migrasi
+alembic upgrade head
+
+# Rollback satu migrasi
+alembic downgrade -1
+
+# Stamp DB yang sudah ada tabelnya (bootstrap alembic tanpa apply)
+alembic stamp head
 ```
+
+File: `backend/alembic.ini`, `backend/migrations/env.py`, `backend/migrations/versions/`. Initial revision `0001_initial` sudah tercatat.
 
 ---
 

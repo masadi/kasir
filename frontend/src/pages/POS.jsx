@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, LogOut, History as HistoryIcon, X, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { printReceipt, isBluetoothSupported } from "@/lib/thermal-printer";
-import OfflineIndicator from "@/components/OfflineIndicator";
 import {
   isOnline,
   cacheProducts,
@@ -153,7 +152,7 @@ export default function POS() {
     }
 
     // Offline / fallback path — queue + local stock decrement
-    await queueTxn(ownerId, payload);
+    await queueTxn(ownerId, payload, { cashier_name: user?.name, cashier_id: user?.id });
     await updateCachedStock(ownerId, cart);
     const cached = await getCachedProducts(ownerId);
     setProducts(cached);
@@ -183,7 +182,6 @@ export default function POS() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <OfflineIndicator />
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
           <div>

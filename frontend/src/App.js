@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import OfflineIndicator from "@/components/OfflineIndicator";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Onboarding from "@/pages/Onboarding";
@@ -26,6 +27,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-center" richColors />
+        <OfflineIndicator />
         <Routes>
           <Route path="/" element={<RoleHome />} />
           <Route path="/login" element={<Login />} />

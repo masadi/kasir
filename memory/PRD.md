@@ -43,6 +43,10 @@ Aplikasi POS untuk warung Indonesia: pembayaran tunai + QRIS statis, struk cetak
 - Fetch dengan query-param auth token untuk `<img src>`
 - File endpoint: JWT + tenant owner_id check
 
+## Added 18 Feb 2026 (Iterasi 4)
+- **Cetak Ulang Offline**: History page section "Antrean Offline" menampilkan pending txns dari IndexedDB, tombol Cetak per baris (via `printReceipt`) + tombol "Sinkron Sekarang" manual. Detail dialog juga menampilkan badge Antrean Offline.
+- **Alembic Migrations**: `backend/alembic.ini`, `migrations/env.py` (async), `migrations/versions/0001_initial.py`. Docker CMD sekarang jalankan `alembic upgrade head` sebelum uvicorn. `OfflineIndicator` dipindah ke App-level supaya sync listener aktif di semua route.
+
 ## Added 18 Feb 2026 (Iterasi 3)
 - **Fase 4 — PWA + Offline Mode**: manifest.json, service worker cache app shell, Dexie IndexedDB untuk products + pending_txns queue, auto-sync saat online event, banner offline/sync indicator.
 - **Foto Produk**: upload image dari Products page (backend already had image_path field). Grid kasir menampilkan foto atau initial letter fallback.

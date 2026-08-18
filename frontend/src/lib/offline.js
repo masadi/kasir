@@ -40,11 +40,13 @@ function localId() {
   return "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 }
 
-export async function queueTxn(ownerId, payload) {
+export async function queueTxn(ownerId, payload, meta = {}) {
   const rec = {
     local_id: localId(),
     owner_id: ownerId,
     payload,
+    cashier_name: meta.cashier_name || null,
+    cashier_id: meta.cashier_id || null,
     created_at: new Date().toISOString(),
     tries: 0,
   };
@@ -57,7 +59,13 @@ export async function getPendingCount(ownerId) {
 }
 
 export async function getPending(ownerId) {
-  return db.pending_txns.where("owner_id").equals(ownerId).toArray();
+  const rows = await db.pending_txns.where("owner_id").equals(ownerId).toArray();
+  // Newest first
+  return rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+}
+
+export async function getPendingOne(localId) {
+  return db.pending_txns.get(localId);
 }
 
 let syncing = false;
