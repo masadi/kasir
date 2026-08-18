@@ -43,6 +43,10 @@ Aplikasi POS untuk warung Indonesia: pembayaran tunai + QRIS statis, struk cetak
 - Fetch dengan query-param auth token untuk `<img src>`
 - File endpoint: JWT + tenant owner_id check
 
+## Added 18 Feb 2026 (Iterasi 6)
+- **Print Label Barcode**: Extend `thermal-printer.js` dengan `buildLabels()` + `printLabels()` menggunakan ESC/POS `GS k` (CODE128, function B), tombol Cetak Label (icon Tag) di tabel Products membuka dialog qty (1–50). Untuk produk tanpa `barcode`, otomatis generate `K + 10 hex dari UUID` lalu PUT save ke DB sebelum cetak — kode yang dicetak = kode yang akan discan.
+- **README Windows**: bagian "Install di Windows (Desktop)" — Docker Desktop + WSL2, PowerShell setup, generate JWT_SECRET, Cloudflare Tunnel & ngrok untuk HTTPS di HP kasir, backup via Task Scheduler, troubleshooting spesifik Windows.
+
 ## Added 18 Feb 2026 (Iterasi 5)
 - **Barcode Scan**: Backend kolom `products.barcode` + endpoint `GET /api/products/by-barcode/{code}` + migrasi Alembic `0002_add_barcode`. Frontend `BarcodeScanner.jsx` pakai native `BarcodeDetector` API (Chrome Android) dengan fallback ketik manual, tombol scan di POS search bar, lookup cache lokal dulu (offline-friendly) lalu server.
 

@@ -207,3 +207,55 @@ export async function printReceipt(payload) {
   const data = buildReceipt(payload);
   await printBytes(data);
 }
+
+// ---------- Barcode labels (ESC/POS CODE128) ----------
+
+// Deterministic short barcode derived from product id (12 chars, uppercase hex-safe).
+export function generateBarcode(productId) {
+  const hex = String(productId).replace(/-/g, "").slice(0, 10).toUpperCase();
+  return "K" + hex;
+}
+
+export function buildLabels({ store, product, qty, price }) {
+  const chunks = [];
+  chunks.push(bytes(ESC, 0x40)); // init
+  const code = (product.barcode && product.barcode.trim()) || generateBarcode(product.id);
+  const count = Math.max(1, Math.min(50, Number(qty) || 1));
+  for (let i = 0; i < count; i++) {
+    // Center align
+    chunks.push(bytes(ESC, 0x61, 0x01));
+    if (store?.shop_name) {
+      chunks.push(textBytes(String(store.shop_name).slice(0, LINE_WIDTH)));
+      chunks.push([LF]);
+    }
+    // Bold product name (double height)
+    chunks.push(bytes(ESC, 0x21, 0x10));
+    chunks.push(textBytes(String(product.name).slice(0, LINE_WIDTH)));
+    chunks.push([LF]);
+    chunks.push(bytes(ESC, 0x21, 0x00));
+    // Price
+    chunks.push(textBytes("Rp " + Number(price ?? product.price).toLocaleString("id-ID")));
+    chunks.push([LF, LF]);
+    // Barcode formatting: width=2, height=80, HRI below, font A
+    chunks.push(bytes(GS, 0x77, 0x02));
+    chunks.push(bytes(GS, 0x68, 0x50));
+    chunks.push(bytes(GS, 0x48, 0x02));
+    chunks.push(bytes(GS, 0x66, 0x00));
+    // CODE128 via GS k Function B (m=73) with code-set B prefix "{B"
+    const payload = "{B" + code;
+    const payloadBytes = textBytes(payload);
+    chunks.push(bytes(GS, 0x6b, 0x49, payloadBytes.length, ...payloadBytes));
+    chunks.push([LF, LF]);
+    chunks.push(bytes(ESC, 0x61, 0x00));
+  }
+  // Cut at end
+  chunks.push(bytes(GS, 0x56, 0x01));
+  const flat = [];
+  for (const c of chunks) for (const b of c) flat.push(b);
+  return new Uint8Array(flat);
+}
+
+export async function printLabels(payload) {
+  const data = buildLabels(payload);
+  await printBytes(data);
+}

@@ -14,7 +14,9 @@ Stack: **FastAPI + PostgreSQL + React (CRA) + Tailwind + shadcn/ui**. Object sto
 - CRUD produk (harga jual, HPP, stok, satuan pcs/kg/ons/botol/bungkus, ambang stok menipis)
 - Layar kasir mobile-first: search, kategori, keranjang, modal qty desimal, bayar Tunai (kembalian otomatis) atau QRIS
 - Cetak struk thermal **58mm** via Web Bluetooth (ESC/POS byte encoder)
-- Cetak ulang dari riwayat
+- Cetak ulang dari riwayat + cetak label barcode CODE128 per produk
+- Barcode scan pakai native `BarcodeDetector` (Chrome Android) dengan fallback manual
+- Mode offline (Dexie IndexedDB) — transaksi antri lokal, auto-sync saat online
 - Dashboard: kartu ringkasan, grafik 7 hari (Recharts), stok menipis
 - Tutup toko → generate ringkasan → kirim ke WA pemilik via `wa.me`
 - Onboarding wizard 4 langkah
@@ -23,6 +25,8 @@ Stack: **FastAPI + PostgreSQL + React (CRA) + Tailwind + shadcn/ui**. Object sto
 ---
 
 ## Deployment ke VPS Ubuntu dengan Docker
+
+> Untuk Windows lihat bagian [Install di Windows](#install-di-windows-desktop).
 
 ### 0. Prasyarat VPS
 - Ubuntu 22.04 LTS (atau 20.04) — 1 vCPU, 2 GB RAM, 20 GB disk minimum
@@ -224,8 +228,121 @@ File: `backend/alembic.ini`, `backend/migrations/env.py`, `backend/migrations/ve
 
 ---
 
-## Development Lokal (tanpa Docker)
-```bash
+## Install di Windows (Desktop)
+
+Cocok untuk **coba dulu di laptop toko**, uji cetak dari HP kasir sebelum sewa VPS.
+
+### 0. Prasyarat
+- Windows 10 (build 19041+) atau Windows 11
+- Minimal 8 GB RAM (Docker Desktop butuh 4 GB idle)
+- Koneksi internet untuk sekali download images
+
+### 1. Install Tools
+1. **Docker Desktop for Windows** — https://www.docker.com/products/docker-desktop
+   - Saat instalasi pilih **Use WSL 2 based engine** (default & disarankan). Kalau WSL2 belum aktif, installer akan minta restart untuk mengaktifkan Virtual Machine Platform + install kernel WSL.
+2. **Git for Windows** — https://git-scm.com/download/win (pilih semua default)
+3. (Opsional) **Windows Terminal** dari Microsoft Store agar PowerShell lebih nyaman.
+
+Setelah install, buka Docker Desktop sampai statusnya **Running** (icon paus di system tray hijau).
+
+### 2. Clone & Konfigurasi
+Buka **PowerShell** (bukan CMD):
+```powershell
+git clone <URL_REPO_KAMU> C:\kasirku
+cd C:\kasirku
+
+Copy-Item backend\.env.example backend\.env
+Copy-Item frontend\.env.example frontend\.env
+
+# Generate JWT secret 64-char hex
+$secret = -join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
+Write-Host "JWT_SECRET=$secret"
+```
+Buka `backend\.env` di **Notepad** atau **VS Code** dan isi minimal:
+- `JWT_SECRET` (paste dari output di atas)
+- `ADMIN_EMAIL` dan `ADMIN_PASSWORD`
+- `EMERGENT_LLM_KEY` (opsional — hanya kalau butuh upload QRIS/foto)
+
+Bikin file `.env` di root (untuk docker-compose):
+```powershell
+@"
+POSTGRES_USER=kasirku
+POSTGRES_PASSWORD=gantiPasswordKuat123
+POSTGRES_DB=kasirku
+PUBLIC_URL=http://localhost:8080
+"@ | Out-File -Encoding utf8 .env
+```
+
+Sinkronkan `DATABASE_URL` di `backend\.env` dengan password di atas:
+```
+DATABASE_URL="postgresql+asyncpg://kasirku:gantiPasswordKuat123@postgres:5432/kasirku"
+```
+
+### 3. Jalankan
+```powershell
+docker compose up -d --build
+docker compose ps
+docker compose logs -f backend
+```
+Tekan `Ctrl+C` di log untuk keluar (container tetap jalan di background).
+
+Aplikasi tersedia di:
+- **Owner dashboard**: http://localhost:8080
+
+Login pakai `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Owner default akan di-seed otomatis + tabel di-migrate oleh Alembic saat container backend pertama kali start.
+
+### 4. HTTPS untuk Uji dari HP Kasir (WAJIB untuk Web Bluetooth)
+Web Bluetooth (dan `BarcodeDetector` camera scan) **butuh HTTPS**. Localhost hanya jalan di komputer yang sama — HP kasir butuh URL HTTPS. Dua opsi termudah tanpa VPS:
+
+**A) Cloudflare Tunnel (gratis, tidak perlu port forward)**
+```powershell
+winget install --id Cloudflare.cloudflared
+# Tunnel sementara — dapat sub-domain acak trycloudflare.com
+cloudflared tunnel --url http://localhost:8080
+```
+Copy URL `https://xxxxx.trycloudflare.com`, buka di HP Android — Web Bluetooth aktif.
+
+Untuk domain permanen: `cloudflared tunnel login` → `cloudflared tunnel create kasirku` → ikuti wizard di https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/.
+
+**B) ngrok (mudah, gratis untuk uji)**
+```powershell
+winget install ngrok.ngrok
+ngrok config add-authtoken <token dari dashboard ngrok>
+ngrok http 8080
+```
+Copy URL `https://xxxx.ngrok.app` → buka di HP kasir.
+
+> Setelah dapat URL HTTPS, edit `frontend\.env` → `REACT_APP_BACKEND_URL=https://xxxx.ngrok.app` lalu `docker compose up -d --build frontend`.
+
+### 5. Update / Restart
+```powershell
+cd C:\kasirku
+git pull
+docker compose up -d --build
+```
+
+### 6. Backup Postgres di Windows
+```powershell
+$date = Get-Date -Format "yyyy-MM-dd"
+docker exec kasirku-postgres pg_dump -U kasirku -d kasirku -Fc > "C:\backups\kasirku-$date.dump"
+```
+Jadwalkan via **Task Scheduler** (`taskschd.msc`) — Actions → Start a program → `powershell.exe -File C:\kasirku\backup.ps1`.
+
+Restore:
+```powershell
+Get-Content C:\backups\kasirku-2026-02-18.dump | docker exec -i kasirku-postgres pg_restore -U kasirku -d kasirku --clean --if-exists
+```
+
+### Troubleshooting Windows
+- **`docker: command not found`** — Docker Desktop belum jalan atau belum reboot setelah install. Buka Docker Desktop dari Start Menu.
+- **`WSL 2 installation is incomplete`** — Jalankan di PowerShell admin: `wsl --install` lalu restart.
+- **Port 8080 dipakai aplikasi lain** — Ubah `ports: - "8080:80"` di `docker-compose.yml` ke port lain (mis. `9090:80`), lalu update `PUBLIC_URL` sesuai.
+- **Cetak thermal / scan kamera tidak jalan di HP** — pastikan sudah buka via URL HTTPS (Cloudflare Tunnel/ngrok), bukan IP lokal `http://192.168.x.x`.
+- **Container sering restart** — Cek RAM Docker Desktop: Settings → Resources → Memory ≥ 4 GB.
+
+---
+
+## Development Lokal (tanpa Docker)```bash
 # 1. Jalankan Postgres via docker
 docker run -d --name kasirku-pg -p 5432:5432 \
   -e POSTGRES_USER=kasirku -e POSTGRES_PASSWORD=kasirku_dev -e POSTGRES_DB=kasirku \
